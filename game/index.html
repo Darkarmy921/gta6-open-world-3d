@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Cayo Azul — a 3D open-world crime game in the browser. Drive, steal, work jobs, run eight story missions, and outrun the police across an island port city.">
+<link rel="icon" href="data:,">
+<title>Cayo Azul — 3D Open-World Crime Game</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: #0a1420; overflow: hidden;
+    font-family: "Segoe UI", Verdana, sans-serif; color: #f2f2f2; }
+  body { display: flex; align-items: center; justify-content: center; }
+  #stage { position: relative; width: 1280px; height: 720px; flex: none;
+    background: #000; overflow: hidden; }
+  #game { display: block; width: 1280px; height: 720px; }
+  .hud { position: absolute; pointer-events: none; z-index: 5;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9); }
+  #health-track { left: 18px; top: 16px; width: 220px; height: 16px;
+    background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.5);
+    border-radius: 3px; overflow: hidden; }
+  #health { height: 100%; width: 100%; background: linear-gradient(90deg, #37c24a, #7be382);
+    transition: width 0.15s linear; }
+  #health.low { background: linear-gradient(90deg, #c22e2e, #ff7a5c); }
+  #money { left: 18px; top: 38px; font-size: 22px; font-weight: 700; color: #7dff8a; }
+  #stars { left: 18px; top: 68px; font-size: 26px; letter-spacing: 4px; color: #ffd23e; }
+  #stars .off { color: rgba(255,255,255,0.35); }
+  #clock { right: 18px; top: 14px; font-size: 22px; font-weight: 700; text-align: right; }
+  #district { right: 18px; top: 44px; font-size: 15px; text-align: right; color: #cfe8ff; }
+  #radio { right: 18px; top: 68px; font-size: 14px; text-align: right; color: #ffd9a0; }
+  #objective { left: 50%; top: 14px; transform: translateX(-50%); max-width: 560px;
+    font-size: 16px; font-weight: 600; text-align: center; background: rgba(0,0,0,0.55);
+    padding: 6px 14px; border-radius: 4px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; }
+  #objective:empty { display: none; }
+  #speed { right: 18px; bottom: 170px; font-size: 20px; font-weight: 700; text-align: right; }
+  #speed:empty { display: none; }
+  #streak { left: 18px; bottom: 170px; font-size: 18px; font-weight: 700; color: #ff9d5c; }
+  #streak:empty { display: none; }
+  #banner { left: 18px; bottom: 18px; max-width: 560px; font-size: 17px; font-weight: 600;
+    background: rgba(0,0,0,0.55); padding: 8px 14px; border-radius: 4px; }
+  #banner:empty { display: none; }
+  #banner small { display: block; font-size: 13px; font-weight: 400; color: #cfe8ff; }
+  #hint { left: 50%; bottom: 8px; transform: translateX(-50%); font-size: 12px;
+    color: rgba(255,255,255,0.65); white-space: nowrap; }
+  #minimap { right: 18px; bottom: 18px; width: 200px; height: 140px;
+    border: 2px solid rgba(255,255,255,0.6); border-radius: 4px;
+    background: rgba(10,20,32,0.85); }
+  #toast { left: 50%; top: 110px; transform: translateX(-50%); font-size: 18px;
+    font-weight: 700; color: #ffe27a; background: rgba(0,0,0,0.6);
+    padding: 8px 18px; border-radius: 4px; display: none; white-space: nowrap; }
+  #damage-flash { position: absolute; inset: 0; z-index: 4; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(200,20,20,0.55) 100%);
+    opacity: 0; }
+  .screen { position: absolute; inset: 0; z-index: 10; display: flex;
+    flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(4, 12, 24, 0.82); text-align: center; }
+  .screen[hidden] { display: none; }
+  .screen h1 { font-size: 64px; letter-spacing: 6px; color: #ffd23e;
+    text-shadow: 0 3px 0 #b3541e, 0 6px 18px rgba(0,0,0,0.8); }
+  .screen h2 { font-size: 34px; letter-spacing: 2px; color: #ffd23e; margin-bottom: 14px; }
+  .screen p { font-size: 17px; line-height: 1.5; max-width: 640px; margin: 10px 0; }
+  .screen .story { font-style: italic; color: #cfe8ff; }
+  .controls { font-size: 15px; line-height: 1.9; color: #e8e8e8; margin: 14px 0;
+    background: rgba(255,255,255,0.06); padding: 12px 26px; border-radius: 6px; }
+  .controls b { color: #ffd23e; }
+  .btn { pointer-events: auto; cursor: pointer; font-size: 18px; font-weight: 700;
+    color: #10202f; background: #ffd23e; border: none; border-radius: 5px;
+    padding: 12px 34px; margin: 6px; min-width: 220px; }
+  .btn:hover, .btn:focus-visible { background: #ffe27a; outline: 2px solid #fff; outline-offset: 2px; }
+  .btn.secondary { background: #dfe9f2; }
+  .btn.secondary:hover, .btn.secondary:focus-visible { background: #ffffff; }
+  .btn:disabled { opacity: 0.45; cursor: default; }
+  .fine { font-size: 24px; font-weight: 700; color: #ff8a7a; margin: 8px 0; }
+  .panel { width: 620px; max-height: 300px; overflow-y: auto; text-align: left;
+    background: rgba(255,255,255,0.07); border-radius: 6px; padding: 12px 18px;
+    margin: 10px 0; font-size: 15px; line-height: 1.7; }
+  .panel[hidden] { display: none; }
+  .panel h3 { color: #ffd23e; font-size: 17px; margin-bottom: 6px; }
+  .row { display: flex; gap: 8px; align-items: center; justify-content: center;
+    margin: 8px 0; font-size: 15px; }
+  .row label { color: #cfe8ff; }
+  .row input[type="range"] { width: 180px; }
+  .row select { font-size: 15px; padding: 4px 8px; border-radius: 4px; }
+  #loading { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center;
+    justify-content: center; background: #0a1420; font-size: 20px; color: #cfe8ff; }
+  #loading[hidden] { display: none; }
+  noscript { position: absolute; inset: 0; z-index: 30; display: flex; align-items: center;
+    justify-content: center; background: #0a1420; font-size: 20px; padding: 40px; text-align: center; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game" width="1280" height="720" aria-label="Cayo Azul game view"></canvas>
+  <div id="damage-flash" aria-hidden="true"></div>
+
+  <div id="health-track" class="hud" role="meter" aria-label="Health"><div id="health"></div></div>
+  <div id="money" class="hud">$0</div>
+  <div id="stars" class="hud" aria-label="Wanted level"><span class="off">☆☆☆☆☆</span></div>
+  <div id="clock" class="hud">08:00</div>
+  <div id="district" class="hud">Harbour</div>
+  <div id="radio" class="hud">Radio Azul</div>
+  <div id="objective" class="hud" aria-live="polite"></div>
+  <div id="speed" class="hud"></div>
+  <div id="streak" class="hud"></div>
+  <div id="banner" class="hud" aria-live="polite"></div>
+  <div id="hint" class="hud">E enter car · F melee · R radio · M mission · G garage · Esc pause</div>
+  <canvas id="minimap" class="hud" width="200" height="140" aria-label="Minimap"></canvas>
+  <div id="toast" class="hud" aria-live="polite"></div>
+
+  <div id="title-screen" class="screen" role="dialog" aria-label="Title screen">
+    <h1>CAYO AZUL</h1>
+    <p class="story">Dario Venn, a driver new to the island, takes work from Ilsa Crane at her
+      harbour cafe — while Silas Vane and The Breakers move to take the harbour trade.</p>
+    <div class="controls">
+      <b>W A S D</b> move &nbsp;·&nbsp; <b>Shift</b> sprint &nbsp;·&nbsp; <b>Mouse</b> orbit camera &nbsp;·&nbsp; <b>Wheel</b> zoom<br>
+      <b>E</b> enter / exit car &nbsp;·&nbsp; <b>F</b> melee &nbsp;·&nbsp; <b>R</b> radio station &nbsp;·&nbsp; <b>Space</b> handbrake<br>
+      <b>Esc</b> pause &nbsp;·&nbsp; <b>M</b> mission &nbsp;·&nbsp; <b>G</b> garage
+    </div>
+    <button id="btn-continue" class="btn">Continue</button>
+    <button id="btn-new-game" class="btn secondary">New Game</button>
+  </div>
+
+  <div id="pause-screen" class="screen" role="dialog" aria-label="Pause menu" hidden>
+    <h2>Paused</h2>
+    <button id="btn-resume" class="btn">Resume</button>
+    <button id="btn-save" class="btn secondary">Save Game</button>
+    <button id="btn-jobs" class="btn secondary">Jobs</button>
+    <button id="btn-achievements" class="btn secondary">Achievements</button>
+    <button id="btn-settings" class="btn secondary">Settings</button>
+    <button id="btn-quit" class="btn secondary">Quit to Title</button>
+    <div id="jobs-list" class="panel" hidden></div>
+    <div id="achievements-list" class="panel" hidden></div>
+    <div id="settings-panel" class="panel" hidden>
+      <h3>Settings</h3>
+      <div class="row"><label for="volume">Volume</label>
+        <input id="volume" type="range" min="0" max="100" value="80"></div>
+      <div class="row"><label for="station">Radio station</label>
+        <select id="station"></select></div>
+    </div>
+  </div>
+
+  <div id="busted-screen" class="screen" role="dialog" aria-label="Busted" hidden>
+    <h2>Busted</h2>
+    <p>The police caught up with Dario. The harbour cafe posts bail — for a price.</p>
+    <p class="fine" id="busted-fine"></p>
+    <button id="btn-respawn-busted" class="btn">Respawn at Garage</button>
+  </div>
+
+  <div id="wasted-screen" class="screen" role="dialog" aria-label="Wasted" hidden>
+    <h2>Wasted</h2>
+    <p>Dario wakes up in the harbour clinic, stitched up and lighter in the pocket.</p>
+    <p class="fine" id="wasted-fine"></p>
+    <button id="btn-respawn-wasted" class="btn">Respawn at Garage</button>
+  </div>
+
+  <div id="loading">Loading Cayo Azul…</div>
+  <noscript>Cayo Azul needs JavaScript to run. Please enable JavaScript and reload the page.</noscript>
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/rng.js"></script>
+<script src="js/math3d.js"></script>
+<script src="js/input.js"></script>
+<script src="js/gl.js"></script>
+<script src="js/mesh.js"></script>
+<script src="js/city.js"></script>
+<script src="js/world.js"></script>
+<script src="js/weather.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/radio.js"></script>
+<script src="js/particles.js"></script>
+<script src="js/camera.js"></script>
+<script src="js/cars.js"></script>
+<script src="js/traffic.js"></script>
+<script src="js/player.js"></script>
+<script src="js/police.js"></script>
+<script src="js/missions.js"></script>
+<script src="js/story.js"></script>
+<script src="js/jobs.js"></script>
+<script src="js/events.js"></script>
+<script src="js/garages.js"></script>
+<script src="js/economy.js"></script>
+<script src="js/achievements.js"></script>
+<script src="js/save.js"></script>
+<script src="js/minimap.js"></script>
+<script src="js/hud.js"></script>
+<script src="js/render.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
